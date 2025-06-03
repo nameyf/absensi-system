@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>打卡系统 Sistem Absensi</title>
+  <title>打卡系统 + 日历统计</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: sans-serif; padding: 20px; }
@@ -195,13 +195,17 @@
         cell.className = "header";
         cal.appendChild(cell);
       });
+      const today = new Date();
       for (let i = 0; i < firstDay; i++) cal.appendChild(document.createElement("div"));
       for (let d = 1; d <= days; d++) {
         const dayStr = String(d).padStart(2, "0");
         const info = map[dayStr];
         const div = document.createElement("div");
+        const thisDay = new Date(y, m - 1, d);
         let className = "red";
-        if (info) {
+        if (thisDay > today) {
+          className = "";
+        } else if (info) {
           const inOK = info.in && info.in.includes("正常");
           const outOK = info.out && info.out.includes("正常");
           const inLate = info.in && (info.in.includes("迟到") || info.in.includes("异常"));
@@ -215,7 +219,6 @@
       }
     }
 
-    // 初始化默认月份
     const now = new Date();
     const ym = now.toISOString().slice(0, 7);
     document.getElementById("monthPicker").value = ym;
