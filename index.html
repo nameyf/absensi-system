@@ -16,7 +16,7 @@
 <body>
   <h2>📍 打卡系统 Sistem Absensi</h2>
 
-  <!-- 登录区域 -->
+  <!-- 登录界面 -->
   <div id="loginSection">
     <label>账号 / Akun:</label>
     <input type="text" id="username">
@@ -27,11 +27,10 @@
     <button onclick="login()">🔐 登录 / Masuk</button>
   </div>
 
-  <!-- 打卡区域 -->
+  <!-- 打卡界面 -->
   <div id="absenSection">
     <form id="form">
-      <label>姓名 / Nama:</label>
-      <input type="text" name="name" required>
+      <input type="hidden" name="name" id="name"> <!-- 自动填账号 -->
 
       <label>打卡类型 / Jenis Absensi:</label>
       <select name="type">
@@ -53,10 +52,9 @@
 
   <script>
     const video = document.getElementById("video");
-    const usernameField = document.getElementById("username");
-    const passwordField = document.getElementById("password");
     const loginSection = document.getElementById("loginSection");
     const absenSection = document.getElementById("absenSection");
+    const nameInput = document.getElementById("name");
 
     const factoryCoords = [
       { lat: -6.270964853426686, lng: 106.35419911087402 }
@@ -78,18 +76,43 @@
       return factoryCoords.some(coord => distance(lat, lng, coord.lat, coord.lng) <= 200);
     }
 
-    function login() {
-      const username = usernameField.value.trim();
-      const password = passwordField.value.trim();
-      if (!username || !password) return alert("请输入账号和密码 / Harap isi akun dan kata sandi");
+    async function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!username || !password) {
+        alert("请输入账号和密码 / Harap isi akun dan kata sandi");
+        return;
+      }
 
-      // 保存登录状态（本地）
+      // 用账号密码发送一个测试请求判断是否有效（不提交照片）
+      const data = new FormData();
+      data.append("username", username);
+      data.append("password", password);
+      data.append("name", username);
+      data.append("type", "登录测试");
+      data.append("lat", 0);
+      data.append("lng", 0);
+      data.append("photo", "data:image/jpeg;base64,test");
+
+      const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
+        method: "POST",
+        body: data,
+      });
+      const text = await res.text();
+      if (!text.includes("打卡成功") && !text.includes("Absen berhasil")) {
+        alert("❌ 登录失败 / Login gagal\n请检查账号密码");
+        return;
+      }
+
+      // 登录成功，保存信息
       localStorage.setItem("username", username);
       localStorage.setItem("password", password);
+      nameInput.value = username; // 自动填入账号作为姓名
 
       loginSection.style.display = "none";
       absenSection.style.display = "block";
 
+      // 打开摄像头
       navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
         video.srcObject = stream;
       });
@@ -111,7 +134,7 @@
         const lng = pos.coords.longitude;
 
         if (!inFactoryRange(lat, lng)) {
-          alert("❌ 不在工厂范围，无法打卡\nTidak dalam area pabrik");
+          alert("❌ 您不在工厂范围内，无法打卡。\nTidak dalam area pabrik.");
           return;
         }
 
@@ -123,17 +146,18 @@
         data.append("lat", lat);
         data.append("lng", lng);
 
-        await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
+        const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
           method: "POST",
           body: data,
-        }).then(r => r.text()).then(msg => alert(msg));
+        });
+        const text = await res.text();
+        alert(text);
       }, () => {
         alert("❌ 获取定位失败 / Gagal mengambil lokasi");
       });
     }
 
-    // 初始显示登录界面
-    loginSection.style.display = "block";
+    loginSection.style.display = "block"; // 初始显示登录界面
   </script>
 </body>
 </html>
