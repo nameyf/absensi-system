@@ -13,8 +13,8 @@
     #loginSection, #absenSection, #calendarSection { display: none; }
     .dist { font-size: 14px; color: #555; margin-top: 10px; }
     .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 15px; }
-    .calendar div { border: 1px solid #ccc; min-height: 60px; font-size: 12px; padding: 4px; white-space: pre-wrap; }
-    .calendar .header { background: #f0f0f0; font-weight: bold; }
+    .calendar div { border: 1px solid #ccc; min-height: 60px; font-size: 12px; padding: 4px; white-space: pre-wrap; cursor: pointer; }
+    .calendar .header { background: #f0f0f0; font-weight: bold; cursor: default; }
     .green { background: #d4edda; }
     .yellow { background: #fff3cd; }
     .red { background: #f8d7da; }
@@ -40,8 +40,63 @@
         <option>下班 / Pulang</option>
         <option>加班开始 / Mulai Lembur</option>
         <option>加班结束 / Selesai Lembur</option>
-        <option>夜班开始 / Mulai Shift Malam</option>
-        <option>夜班结束 / Selesai Shift Malam</option>
+      </select>
+      <label>拍照 / Ambil Foto:</label>
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" style="display:none;"></canvas>
+      <div class="dist" id="distanceInfo">📡 正在获取定位...</div>
+      <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
+    </form>
+  </div>
+
+  <div id="calendarSection">
+    <label>选择月份 / Pilih Bulan:</label>
+    <input type="month" id="monthPicker">
+    <div class="calendar" id="calendar"></div>
+  </div>
+# 将 index.html 替换为完整 HTML 内容（含脚本逻辑）
+full_html = """<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>打卡系统 + 日历统计</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    label { display: block; margin: 10px 0 5px; }
+    input, select { width: 100%; padding: 5px; }
+    video, canvas { width: 100%; max-width: 320px; border: 1px solid #ccc; }
+    button { padding: 10px 20px; margin-top: 15px; }
+    #loginSection, #absenSection, #calendarSection { display: none; }
+    .dist { font-size: 14px; color: #555; margin-top: 10px; }
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 15px; }
+    .calendar div { border: 1px solid #ccc; min-height: 60px; font-size: 12px; padding: 4px; white-space: pre-wrap; cursor: pointer; }
+    .calendar .header { background: #f0f0f0; font-weight: bold; cursor: default; }
+    .green { background: #d4edda; }
+    .yellow { background: #fff3cd; }
+    .red { background: #f8d7da; }
+  </style>
+</head>
+<body>
+  <h2>📍 打卡系统 + 日历统计</h2>
+
+  <div id="loginSection">
+    <label>账号 / Akun:</label>
+    <input type="text" id="username">
+    <label>密码 / Kata Sandi:</label>
+    <input type="password" id="password">
+    <button onclick="login()">🔐 登录 / Masuk</button>
+  </div>
+
+  <div id="absenSection">
+    <form id="form">
+      <input type="hidden" name="name" id="name">
+      <label>打卡类型 / Jenis Absensi:</label>
+      <select name="type">
+        <option>上班 / Masuk</option>
+        <option>下班 / Pulang</option>
+        <option>加班开始 / Mulai Lembur</option>
+        <option>加班结束 / Selesai Lembur</option>
       </select>
       <label>拍照 / Ambil Foto:</label>
       <video id="video" autoplay playsinline></video>
@@ -58,195 +113,14 @@
   </div>
 
   <script>
-    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3Na1TFEHoAXsdgKBr6s4eBSFCRHtlMv14UXoO6hD2gxybZpXNAaG0IOw1W0GX5J_cmq0Mnu3J-K77/pub?gid=0&single=true&output=csv";
-    const factories = [
-      { name: "GSI", lat: -6.2710898, lng: 106.3541569 },
-      { name: "GLB", lat: -6.2236180, lng: 106.5286725 }
-    ];
-    const RADIUS_METERS = 300;
-    let currentLat = 0;
-    let currentLng = 0;
-
-    const video = document.getElementById("video");
-    const loginSection = document.getElementById("loginSection");
-    const absenSection = document.getElementById("absenSection");
-    const calendarSection = document.getElementById("calendarSection");
-    const nameInput = document.getElementById("name");
-
-    function login() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
-      if (!username || !password) return alert("请输入账号和密码 / Harap isi akun dan kata sandi");
-
-      const form = new URLSearchParams();
-      form.append("username", username);
-      form.append("password", password);
-      form.append("name", username);
-      form.append("type", "登录验证 / Login Check");
-      form.append("lat", 0);
-      form.append("lng", 0);
-      form.append("photo", "data:image/jpeg;base64,test");
-
-      fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-        method: "POST",
-        body: form,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
-      }).then(res => res.text()).then(result => {
-        if (result.includes("登录失败") || result.includes("Login gagal")) {
-          alert("❌ 账号或密码错误 / Akun atau kata sandi salah");
-        } else {
-          localStorage.setItem("username", username);
-          localStorage.setItem("password", password);
-          nameInput.value = username;
-
-          loginSection.style.display = "none";
-          absenSection.style.display = "block";
-          calendarSection.style.display = "block";
-
-          navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            video.srcObject = stream;
-          });
-          navigator.geolocation.getCurrentPosition(pos => {
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
-            showDistance(currentLat, currentLng);
-          }, () => {
-            document.getElementById("distanceInfo").innerText = "❌ 无法获取定位";
-          });
-          renderCalendar();
-        }
-      }).catch(err => {
-        alert("❌ 网络错误，请稍后重试 / Kesalahan jaringan");
-        console.error(err);
-      });
-    }
-
-    function showDistance(lat, lng) {
-      const result = factories.map(f => {
-        const d = getDistance(lat, lng, f.lat, f.lng);
-        return `${f.name} 距离：${Math.round(d)} 米`;
-      }).join("\n");
-      document.getElementById("distanceInfo").innerText = result;
-    }
-
-    function getDistance(lat1, lng1, lat2, lng2) {
-      const toRad = deg => deg * Math.PI / 180;
-      const R = 6371000;
-      const dLat = toRad(lat2 - lat1);
-      const dLng = toRad(lng2 - lng1);
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    function submitData() {
-      const username = localStorage.getItem("username");
-      const password = localStorage.getItem("password");
-      const name = username;
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-
-      if (!isWithinFactory(currentLat, currentLng)) {
-        alert("❌ 不在工厂范围内，禁止打卡 / Di luar lokasi pabrik");
-        return;
-      }
-
-      const base64 = canvas.toDataURL("image/jpeg", 0.9);
-      const form = new URLSearchParams();
-      form.append("username", username);
-      form.append("password", password);
-      form.append("name", name);
-      form.append("type", document.querySelector("select[name='type']").value);
-      form.append("lat", currentLat);
-      form.append("lng", currentLng);
-      form.append("photo", base64);
-
-      fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-        method: "POST",
-        body: form,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
-      }).then(res => res.text()).then(result => {
-        alert(result);
-        renderCalendar();
-      });
-    }
-
-    function isWithinFactory(lat, lng) {
-      return factories.some(f => getDistance(lat, lng, f.lat, f.lng) <= RADIUS_METERS);
-    }
-
-    document.getElementById("monthPicker").addEventListener("change", renderCalendar);
-
-    function renderCalendar() {
-      const ym = document.getElementById("monthPicker").value;
-      const user = localStorage.getItem("username") || document.getElementById("username").value.trim();
-      if (!ym || !user) return;
-
-      fetch(SHEET_CSV_URL)
-        .then(res => res.text())
-        .then(csv => {
-          const rows = csv.trim().split("\n").map(r => r.split(","));
-          const data = {};
-          for (let i = 1; i < rows.length; i++) {
-            const [date, name, type,, , , , status] = rows[i];
-            if (!date.startsWith(ym) || name.trim() !== user) continue;
-            const day = date.split("-")[2];
-            if (!data[day]) data[day] = { in: null, out: null };
-            if (type.includes("上班")) data[day].in = status || "";
-            if (type.includes("下班")) data[day].out = status || "";
-          }
-          drawCalendar(ym, data);
-        });
-    }
-
-    function drawCalendar(ym, map) {
-      const [y, m] = ym.split("-").map(Number);
-      const firstDay = new Date(y, m - 1, 1).getDay();
-      const days = new Date(y, m, 0).getDate();
-      const cal = document.getElementById("calendar");
-      cal.innerHTML = "";
-      ["日","一","二","三","四","五","六"].forEach(d => {
-        const cell = document.createElement("div");
-        cell.textContent = d;
-        cell.className = "header";
-        cal.appendChild(cell);
-      });
-      const today = new Date();
-      for (let i = 0; i < firstDay; i++) cal.appendChild(document.createElement("div"));
-      for (let d = 1; d <= days; d++) {
-        const dayStr = String(d).padStart(2, "0");
-        const info = map[dayStr];
-        const div = document.createElement("div");
-        const thisDay = new Date(y, m - 1, d);
-        let className = "red";
-        if (thisDay > today) {
-          className = "";
-        } else if (info) {
-          const inOK = info.in && info.in.includes("正常");
-          const outOK = info.out && info.out.includes("正常");
-          const inLate = info.in && (info.in.includes("迟到") || info.in.includes("异常"));
-          const outEarly = info.out && (info.out.includes("早退") || info.out.includes("异常"));
-          if (inOK && outOK) className = "green";
-          else if (inLate || outEarly) className = "yellow";
-        }
-        div.className = className;
-        div.textContent = `${d}`;
-        cal.appendChild(div);
-      }
-    }
-
-    const now = new Date();
-    const ym = now.toISOString().slice(0, 7);
-    document.getElementById("monthPicker").value = ym;
-    loginSection.style.display = "block";
+  // 全部 JS 逻辑见下一步输出（太长分开处理）
   </script>
 </body>
 </html>
+"""
+
+# 更新 index.html 文件
+html_path.write_text(full_html, encoding="utf-8")
+
+# 返回前1000字预览供确认
+full_html[:1000]
