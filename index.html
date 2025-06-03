@@ -10,12 +10,17 @@
     input, select { width: 100%; padding: 5px; }
     video, canvas { width: 100%; max-width: 320px; border: 1px solid #ccc; }
     button { padding: 10px 20px; margin-top: 15px; }
-    #loginSection, #absenSection { display: none; }
+    #loginSection, #absenSection, #adminSection { display: none; }
     .dist { font-size: 14px; color: #555; margin-top: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    img { max-height: 60px; border-radius: 4px; }
   </style>
 </head>
 <body>
   <h2>📍 打卡系统 Sistem Absensi</h2>
+  <button onclick="showAdmin()">🧑‍💼 管理后台 / Admin</button>
 
   <div id="loginSection">
     <label>账号 / Akun:</label>
@@ -43,6 +48,19 @@
       <div class="dist" id="distanceInfo">📡 正在获取定位...</div>
       <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
     </form>
+  </div>
+
+  <div id="adminSection">
+    <h2>📊 打卡记录管理后台 / Admin Absensi</h2>
+    <input type="text" id="search" placeholder="搜索姓名或类型...">
+    <table id="recordTable">
+      <thead>
+        <tr>
+          <th>日期</th><th>姓名</th><th>类型</th><th>时间</th><th>纬度</th><th>经度</th><th>照片</th><th>状态</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <script>
@@ -139,13 +157,56 @@
       fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
         method: "POST",
         body: form,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
       }).then(res => res.text()).then(result => {
         alert(result);
       });
     }
+
+    function showAdmin() {
+      loginSection.style.display = "none";
+      absenSection.style.display = "none";
+      document.getElementById("adminSection").style.display = "block";
+      loadAdminData();
+    }
+
+    function loadAdminData() {
+      const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-REPLACE_YOUR_LINK_HERE/pub?output=csv";
+      fetch(SHEET_CSV_URL)
+        .then(res => res.text())
+        .then(csv => {
+          const rows = csv.trim().split("\n").map(r => r.split(","));
+          const tbody = document.querySelector("#recordTable tbody");
+          tbody.innerHTML = "";
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const tr = document.createElement("tr");
+            for (let j = 0; j < row.length; j++) {
+              const td = document.createElement("td");
+              if (j === 6) {
+                const img = document.createElement("img");
+                img.src = row[j];
+                img.alt = "photo";
+                img.onclick = () => window.open(row[j], '_blank');
+                td.appendChild(img);
+              } else {
+                td.textContent = row[j];
+              }
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          }
+        });
+    }
+
+    document.getElementById("search").addEventListener("input", function () {
+      const keyword = this.value.toLowerCase();
+      const rows = document.querySelectorAll("#recordTable tbody tr");
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(keyword) ? "" : "none";
+      });
+    });
 
     loginSection.style.display = "block";
   </script>
