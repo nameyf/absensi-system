@@ -37,6 +37,31 @@
 
   <script>
     const video = document.getElementById("video");
+
+    // ✅ 工厂坐标（可添加多个）
+    const factoryCoords = [
+      { lat: -6.270964853426686, lng: 106.35419911087402 },  // 工厂 1
+      { lat: -6.270964853426686, lng: 106.35419911087402 }   // 工厂 2（与工厂1相同）
+    ];
+
+    // ✅ 计算两个点之间的距离（单位：米）
+    function distance(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLng / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // ✅ 判断当前位置是否在任一工厂范围内（200米）
+    function inFactoryRange(lat, lng) {
+      return factoryCoords.some(coord => distance(lat, lng, coord.lat, coord.lng) <= 200);
+    }
+
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
@@ -50,11 +75,19 @@
       const photo = canvas.toDataURL("image/jpeg");
 
       navigator.geolocation.getCurrentPosition(async pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        if (!inFactoryRange(lat, lng)) {
+          alert("❌ 您不在工厂范围内，无法打卡。\nTidak dalam area pabrik, absen ditolak.");
+          return;
+        }
+
         const form = document.getElementById("form");
         const data = new FormData(form);
         data.append("photo", photo);
-        data.append("lat", pos.coords.latitude);
-        data.append("lng", pos.coords.longitude);
+        data.append("lat", lat);
+        data.append("lng", lng);
 
         await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
           method: "POST",
