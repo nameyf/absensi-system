@@ -10,17 +10,19 @@
     input, select { width: 100%; padding: 5px; }
     video, canvas { width: 100%; max-width: 320px; border: 1px solid #ccc; }
     button { padding: 10px 20px; margin-top: 15px; }
-    #loginSection, #absenSection, #adminSection { display: none; }
-    .dist { font-size: 14px; color: #555; margin-top: 10px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f2f2f2; }
-    img { max-height: 60px; border-radius: 4px; }
+    #loginSection, #absenSection { display: none; }
+    .dist, .summary { font-size: 14px; color: #555; margin-top: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; font-size: 12px; }
+    th { background-color: #eee; }
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+    .calendar div { border: 1px solid #ccc; min-height: 60px; font-size: 12px; padding: 3px; }
+    .calendar .header { background: #f0f0f0; font-weight: bold; }
+    .calendar .today { background: #dff0d8; }
   </style>
 </head>
 <body>
   <h2>📍 打卡系统 Sistem Absensi</h2>
-  <button onclick="showAdmin()">🧑‍💼 管理后台 / Admin</button>
 
   <div id="loginSection">
     <label>账号 / Akun:</label>
@@ -48,19 +50,21 @@
       <div class="dist" id="distanceInfo">📡 正在获取定位...</div>
       <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
     </form>
-  </div>
 
-  <div id="adminSection">
-    <h2>📊 打卡记录管理后台 / Admin Absensi</h2>
-    <input type="text" id="search" placeholder="搜索姓名或类型...">
-    <table id="recordTable">
-      <thead>
-        <tr>
-          <th>日期</th><th>姓名</th><th>类型</th><th>时间</th><th>纬度</th><th>经度</th><th>照片</th><th>状态</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="summary">
+      <h3>📅 我的每日打卡记录</h3>
+      <label>选择月份 / Pilih Bulan:</label>
+      <input type="month" id="monthPicker">
+      <table>
+        <thead>
+          <tr><th>日期</th><th>类型</th><th>时间</th><th>状态</th></tr>
+        </thead>
+        <tbody id="myLog"></tbody>
+      </table>
+      <h4>📆 日历打卡统计</h4>
+      <div class="calendar" id="calendar"></div>
+      <button onclick="window.print()">🖨️ 导出 PDF</button>
+    </div>
   </div>
 
   <script>
@@ -71,6 +75,8 @@
     const RADIUS_METERS = 300;
     let currentLat = 0;
     let currentLng = 0;
+
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3Na1TFEHoAXsdgKBr6s4eBSFCRHtlMv14UXoO6hD2gxybZpXNAaG0IOw1W0GX5J_cmq0Mnu3J-K77/pub?gid=0&single=true&output=csv";
 
     const video = document.getElementById("video");
     const loginSection = document.getElementById("loginSection");
@@ -84,11 +90,9 @@
         alert("请输入账号和密码 / Harap isi akun dan kata sandi");
         return;
       }
-
       localStorage.setItem("username", username);
       localStorage.setItem("password", password);
       nameInput.value = username;
-
       loginSection.style.display = "none";
       absenSection.style.display = "block";
 
@@ -103,6 +107,12 @@
       }, () => {
         document.getElementById("distanceInfo").innerText = "❌ 无法获取定位";
       });
+
+      const mp = document.getElementById("monthPicker");
+      const today = new Date();
+      mp.value = today.toISOString().slice(0, 7);
+      mp.addEventListener("change", () => loadMyRecords(username));
+      loadMyRecords(username);
     }
 
     function getDistance(lat1, lng1, lat2, lng2) {
@@ -160,53 +170,55 @@
         headers: { "Content-Type": "application/x-www-form-urlencoded" }
       }).then(res => res.text()).then(result => {
         alert(result);
+        loadMyRecords(username);
       });
     }
 
-    function showAdmin() {
-      loginSection.style.display = "none";
-      absenSection.style.display = "none";
-      document.getElementById("adminSection").style.display = "block";
-      loadAdminData();
-    }
-
-    function loadAdminData() {
-      const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3Na1TFEHoAXsdgKBr6s4eBSFCRHtlMv14UXoO6hD2gxybZpXNAaG0IOw1W0GX5J_cmq0Mnu3J-K77/pub?gid=0&single=true&output=csv";
+    function loadMyRecords(username) {
+      const selectedMonth = document.getElementById("monthPicker").value;
       fetch(SHEET_CSV_URL)
         .then(res => res.text())
         .then(csv => {
           const rows = csv.trim().split("\n").map(r => r.split(","));
-          const tbody = document.querySelector("#recordTable tbody");
+          const tbody = document.getElementById("myLog");
           tbody.innerHTML = "";
+          const calendarMap = {};
           for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
+            const [date, name, type, datetime, lat, lng, photo, status] = rows[i];
+            if (name.trim() !== username) continue;
+            if (!date.startsWith(selectedMonth)) continue;
             const tr = document.createElement("tr");
-            for (let j = 0; j < row.length; j++) {
-              const td = document.createElement("td");
-              if (j === 6) {
-                const img = document.createElement("img");
-                img.src = row[j];
-                img.alt = "photo";
-                img.onclick = () => window.open(row[j], '_blank');
-                td.appendChild(img);
-              } else {
-                td.textContent = row[j];
-              }
-              tr.appendChild(td);
-            }
+            tr.innerHTML = `<td>${date}</td><td>${type}</td><td>${datetime}</td><td>${status || ''}</td>`;
             tbody.appendChild(tr);
+            const day = date.split("-")[2];
+            calendarMap[day] = (calendarMap[day] || 0) + 1;
           }
+          renderCalendar(selectedMonth, calendarMap);
         });
     }
 
-    document.getElementById("search").addEventListener("input", function () {
-      const keyword = this.value.toLowerCase();
-      const rows = document.querySelectorAll("#recordTable tbody tr");
-      rows.forEach(r => {
-        const text = r.textContent.toLowerCase();
-        r.style.display = text.includes(keyword) ? "" : "none";
+    function renderCalendar(ym, map) {
+      const [y, m] = ym.split("-").map(Number);
+      const firstDay = new Date(y, m - 1, 1).getDay();
+      const days = new Date(y, m, 0).getDate();
+      const cal = document.getElementById("calendar");
+      cal.innerHTML = "";
+      ["日","一","二","三","四","五","六"].forEach(d => {
+        const cell = document.createElement("div");
+        cell.textContent = d;
+        cell.className = "header";
+        cal.appendChild(cell);
       });
-    });
+      for (let i = 0; i < firstDay; i++) cal.appendChild(document.createElement("div"));
+      for (let d = 1; d <= days; d++) {
+        const cell = document.createElement("div");
+        const count = map[String(d).padStart(2, "0")] || 0;
+        cell.textContent = `${d}\n${count}次`;
+        const today = new Date();
+        if (y === today.getFullYear() && m === today.getMonth() + 1 && d === today.getDate()) cell.className = "today";
+        cal.appendChild(cell);
+      }
+    }
 
     loginSection.style.display = "block";
   </script>
