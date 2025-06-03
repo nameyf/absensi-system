@@ -16,22 +16,17 @@
 <body>
   <h2>📍 打卡系统 Sistem Absensi</h2>
 
-  <!-- 登录界面 -->
   <div id="loginSection">
     <label>账号 / Akun:</label>
     <input type="text" id="username">
-
     <label>密码 / Kata Sandi:</label>
     <input type="password" id="password">
-
     <button onclick="login()">🔐 登录 / Masuk</button>
   </div>
 
-  <!-- 打卡界面 -->
   <div id="absenSection">
     <form id="form">
-      <input type="hidden" name="name" id="name"> <!-- 自动填账号 -->
-
+      <input type="hidden" name="name" id="name">
       <label>打卡类型 / Jenis Absensi:</label>
       <select name="type">
         <option>上班 / Masuk</option>
@@ -41,11 +36,9 @@
         <option>夜班开始 / Mulai Shift Malam</option>
         <option>夜班结束 / Selesai Shift Malam</option>
       </select>
-
       <label>拍照 / Ambil Foto:</label>
       <video id="video" autoplay playsinline></video>
       <canvas id="canvas" style="display:none;"></canvas>
-
       <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
     </form>
   </div>
@@ -84,35 +77,13 @@
         return;
       }
 
-      // 用账号密码发送一个测试请求判断是否有效（不提交照片）
-      const data = new FormData();
-      data.append("username", username);
-      data.append("password", password);
-      data.append("name", username);
-      data.append("type", "登录测试");
-      data.append("lat", 0);
-      data.append("lng", 0);
-      data.append("photo", "data:image/jpeg;base64,test");
-
-      const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-        method: "POST",
-        body: data,
-      });
-      const text = await res.text();
-      if (!text.includes("打卡成功") && !text.includes("Absen berhasil")) {
-        alert("❌ 登录失败 / Login gagal\n请检查账号密码");
-        return;
-      }
-
-      // 登录成功，保存信息
       localStorage.setItem("username", username);
       localStorage.setItem("password", password);
-      nameInput.value = username; // 自动填入账号作为姓名
+      nameInput.value = username;
 
       loginSection.style.display = "none";
       absenSection.style.display = "block";
 
-      // 打开摄像头
       navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
         video.srcObject = stream;
       });
@@ -127,37 +98,38 @@
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
-      const photo = canvas.toDataURL("image/jpeg");
 
       navigator.geolocation.getCurrentPosition(async pos => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
 
         if (!inFactoryRange(lat, lng)) {
-          alert("❌ 您不在工厂范围内，无法打卡。\nTidak dalam area pabrik.");
+          alert("❌ 不在工厂范围内，无法打卡");
           return;
         }
 
-        const form = document.getElementById("form");
-        const data = new FormData(form);
-        data.append("username", username);
-        data.append("password", password);
-        data.append("photo", photo);
-        data.append("lat", lat);
-        data.append("lng", lng);
+        canvas.toBlob(async function(blob) {
+          const form = document.getElementById("form");
+          const data = new FormData(form);
+          data.append("username", username);
+          data.append("password", password);
+          data.append("lat", lat);
+          data.append("lng", lng);
+          data.append("photo", new File([blob], "photo.jpg", { type: "image/jpeg" }));
 
-        const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-          method: "POST",
-          body: data,
-        });
-        const text = await res.text();
-        alert(text);
+          const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
+            method: "POST",
+            body: data,
+          });
+          const text = await res.text();
+          alert(text);
+        }, "image/jpeg", 0.85);
       }, () => {
         alert("❌ 获取定位失败 / Gagal mengambil lokasi");
       });
     }
 
-    loginSection.style.display = "block"; // 初始显示登录界面
+    loginSection.style.display = "block";
   </script>
 </body>
 </html>
