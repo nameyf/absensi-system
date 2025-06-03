@@ -11,6 +11,7 @@
     video, canvas { width: 100%; max-width: 320px; border: 1px solid #ccc; }
     button { padding: 10px 20px; margin-top: 15px; }
     #loginSection, #absenSection { display: none; }
+    .dist { font-size: 14px; color: #555; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -39,11 +40,20 @@
       <label>拍照 / Ambil Foto:</label>
       <video id="video" autoplay playsinline></video>
       <canvas id="canvas" style="display:none;"></canvas>
+      <div class="dist" id="distanceInfo">📡 正在获取定位...</div>
       <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
     </form>
   </div>
 
   <script>
+    const factories = [
+      { name: "工厂1", lat: -6.2710898, lng: 106.3541569 },
+      { name: "工厂2", lat: -6.2236180, lng: 106.5286725 }
+    ];
+    const RADIUS_METERS = 300;
+    let currentLat = 0;
+    let currentLng = 0;
+
     const video = document.getElementById("video");
     const loginSection = document.getElementById("loginSection");
     const absenSection = document.getElementById("absenSection");
@@ -67,6 +77,37 @@
       navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
         video.srcObject = stream;
       });
+
+      navigator.geolocation.getCurrentPosition(pos => {
+        currentLat = pos.coords.latitude;
+        currentLng = pos.coords.longitude;
+        showDistance(currentLat, currentLng);
+      }, () => {
+        document.getElementById("distanceInfo").innerText = "❌ 无法获取定位";
+      });
+    }
+
+    function getDistance(lat1, lng1, lat2, lng2) {
+      const toRad = deg => deg * Math.PI / 180;
+      const R = 6371000;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function showDistance(lat, lng) {
+      const result = factories.map(f => {
+        const d = getDistance(lat, lng, f.lat, f.lng);
+        return `${f.name} 距离：${Math.round(d)} 米`;
+      }).join("\n");
+      document.getElementById("distanceInfo").innerText = result;
+    }
+
+    function isWithinFactory(lat, lng) {
+      return factories.some(f => getDistance(lat, lng, f.lat, f.lng) <= RADIUS_METERS);
     }
 
     function submitData() {
@@ -80,33 +121,29 @@
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
 
-      navigator.geolocation.getCurrentPosition(async pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+      if (!isWithinFactory(currentLat, currentLng)) {
+        alert("❌ 不在工厂范围内，禁止打卡 / Di luar lokasi pabrik");
+        return;
+      }
 
-        const base64 = canvas.toDataURL("image/jpeg", 0.9);
+      const base64 = canvas.toDataURL("image/jpeg", 0.9);
+      const form = new URLSearchParams();
+      form.append("username", username);
+      form.append("password", password);
+      form.append("name", name);
+      form.append("type", document.querySelector("select[name='type']").value);
+      form.append("lat", currentLat);
+      form.append("lng", currentLng);
+      form.append("photo", base64);
 
-        const form = new URLSearchParams();
-        form.append("username", username);
-        form.append("password", password);
-        form.append("name", name);
-        form.append("type", document.querySelector("select[name='type']").value);
-        form.append("lat", lat);
-        form.append("lng", lng);
-        form.append("photo", base64);
-
-        const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-          method: "POST",
-          body: form,
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          }
-        });
-
-        const result = await res.text();
+      fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
+        method: "POST",
+        body: form,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      }).then(res => res.text()).then(result => {
         alert(result);
-      }, () => {
-        alert("❌ 无法获取定位 / Gagal ambil lokasi");
       });
     }
 
