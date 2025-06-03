@@ -70,7 +70,6 @@
     }
 
     function submitData() {
-      console.log("▶️ 开始打卡...");
       const username = localStorage.getItem("username");
       const password = localStorage.getItem("password");
       const name = username;
@@ -84,7 +83,6 @@
       navigator.geolocation.getCurrentPosition(async pos => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        console.log("📸 拍照和定位成功", lat, lng);
 
         const base64 = canvas.toDataURL("image/jpeg", 0.9);
 
@@ -97,8 +95,7 @@
         form.append("lng", lng);
         form.append("photo", base64);
 
-        console.log("🚀 正在上传数据...");
-        const res = await fetch("YOUR_SCRIPT_URL_HERE", {
+        const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
           method: "POST",
           body: form,
           headers: {
@@ -107,10 +104,8 @@
         });
 
         const result = await res.text();
-        console.log("✅ 上传结果：", result);
         alert(result);
-      }, err => {
-        console.error("❌ 获取定位失败", err);
+      }, () => {
         alert("❌ 无法获取定位 / Gagal ambil lokasi");
       });
     }
