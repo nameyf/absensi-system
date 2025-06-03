@@ -40,8 +40,6 @@
         <option>下班 / Pulang</option>
         <option>加班开始 / Mulai Lembur</option>
         <option>加班结束 / Selesai Lembur</option>
-        <option>夜班开始 / Mulai Shift Malam</option>
-        <option>夜班结束 / Selesai Shift Malam</option>
       </select>
       <label>拍照 / Ambil Foto:</label>
       <video id="video" autoplay playsinline></video>
@@ -170,9 +168,7 @@
       fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
         method: "POST",
         body: form,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
       }).then(res => res.text()).then(result => {
         alert(result);
         renderCalendar();
@@ -194,20 +190,25 @@
         .then(res => res.text())
         .then(csv => {
           const rows = csv.trim().split("\n").map(r => r.split(","));
-          const data = {};
+          const map = {};
+          const logs = {};
           for (let i = 1; i < rows.length; i++) {
-            const [date, name, type,, , , , status] = rows[i];
+            const [date, name, type, datetime, , , , status] = rows[i];
             if (!date.startsWith(ym) || name.trim() !== user) continue;
             const day = date.split("-")[2];
-            if (!data[day]) data[day] = { in: null, out: null };
-            if (type.includes("上班")) data[day].in = status || "";
-            if (type.includes("下班")) data[day].out = status || "";
+            if (!map[day]) map[day] = { in: null, out: null };
+            if (!logs[day]) logs[day] = [];
+            logs[day].push({ type, datetime, status });
+
+            // 限制每种类型只统计最早一条
+            if (type.includes("上班") && !map[day].in) map[day].in = status;
+            if (type.includes("下班") && !map[day].out) map[day].out = status;
           }
-          drawCalendar(ym, data);
+          drawCalendar(ym, map, logs);
         });
     }
 
-    function drawCalendar(ym, map) {
+    function drawCalendar(ym, statusMap, logsMap) {
       const [y, m] = ym.split("-").map(Number);
       const firstDay = new Date(y, m - 1, 1).getDay();
       const days = new Date(y, m, 0).getDate();
@@ -223,29 +224,33 @@
       for (let i = 0; i < firstDay; i++) cal.appendChild(document.createElement("div"));
       for (let d = 1; d <= days; d++) {
         const dayStr = String(d).padStart(2, "0");
-        const info = map[dayStr];
+        const status = statusMap[dayStr];
+        const log = logsMap[dayStr] || [];
         const div = document.createElement("div");
         const thisDay = new Date(y, m - 1, d);
         let className = "red";
-        if (thisDay > today) {
-          className = "";
-        } else if (info) {
-          const inOK = info.in && info.in.includes("正常");
-          const outOK = info.out && info.out.includes("正常");
-          const inLate = info.in && (info.in.includes("迟到") || info.in.includes("异常"));
-          const outEarly = info.out && (info.out.includes("早退") || info.out.includes("异常"));
+        if (thisDay > today) className = "";
+        else if (status) {
+          const inOK = status.in && status.in.includes("正常");
+          const outOK = status.out && status.out.includes("正常");
+          const inLate = status.in && (status.in.includes("迟到") || status.in.includes("异常"));
+          const outEarly = status.out && (status.out.includes("早退") || status.out.includes("异常"));
           if (inOK && outOK) className = "green";
           else if (inLate || outEarly) className = "yellow";
         }
         div.className = className;
-        div.textContent = `${d}`;
+        div.innerText = `${d} 日\n${log.length} 次`;
+        div.style.cursor = "pointer";
+        div.onclick = () => {
+          if (!log.length) return;
+          alert(`📅 ${ym}-${dayStr} 明细:\n` + log.map(x => `• ${x.type} - ${x.datetime}\n${x.status}`).join("\n\n"));
+        };
         cal.appendChild(div);
       }
     }
 
     const now = new Date();
-    const ym = now.toISOString().slice(0, 7);
-    document.getElementById("monthPicker").value = ym;
+    document.getElementById("monthPicker").value = now.toISOString().slice(0, 7);
     loginSection.style.display = "block";
   </script>
 </body>
