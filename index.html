@@ -49,27 +49,7 @@
     const absenSection = document.getElementById("absenSection");
     const nameInput = document.getElementById("name");
 
-    const factoryCoords = [
-      { lat: -6.270964853426686, lng: 106.35419911087402 }
-    ];
-
-    function distance(lat1, lng1, lat2, lng2) {
-      const R = 6371000;
-      const toRad = x => x * Math.PI / 180;
-      const dLat = toRad(lat2 - lat1);
-      const dLng = toRad(lng2 - lng1);
-      const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                Math.sin(dLng / 2) ** 2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    }
-
-    function inFactoryRange(lat, lng) {
-      return factoryCoords.some(coord => distance(lat, lng, coord.lat, coord.lng) <= 200);
-    }
-
-    async function login() {
+    function login() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
       if (!username || !password) {
@@ -89,9 +69,10 @@
       });
     }
 
-    async function submitData() {
+    function submitData() {
       const username = localStorage.getItem("username");
       const password = localStorage.getItem("password");
+      const name = username;
 
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
@@ -103,29 +84,29 @@
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
 
-        if (!inFactoryRange(lat, lng)) {
-          alert("❌ 不在工厂范围内，无法打卡");
-          return;
-        }
+        const base64 = canvas.toDataURL("image/jpeg", 0.9);
 
-        canvas.toBlob(async function(blob) {
-          const form = document.getElementById("form");
-          const data = new FormData(form);
-          data.append("username", username);
-          data.append("password", password);
-          data.append("lat", lat);
-          data.append("lng", lng);
-          data.append("photo", new File([blob], "photo.jpg", { type: "image/jpeg" }));
+        const form = new URLSearchParams();
+        form.append("username", username);
+        form.append("password", password);
+        form.append("name", name);
+        form.append("type", document.querySelector("select[name='type']").value);
+        form.append("lat", lat);
+        form.append("lng", lng);
+        form.append("photo", base64);
 
-          const res = await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
-            method: "POST",
-            body: data,
-          });
-          const text = await res.text();
-          alert(text);
-        }, "image/jpeg", 0.85);
+        const res = await fetch("YOUR_WEB_APP_URL", {
+          method: "POST",
+          body: form,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        });
+
+        const result = await res.text();
+        alert(result);
       }, () => {
-        alert("❌ 获取定位失败 / Gagal mengambil lokasi");
+        alert("❌ 无法获取定位 / Gagal ambil lokasi");
       });
     }
 
