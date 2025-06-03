@@ -171,7 +171,7 @@
     }
 
     function loadAdminData() {
-      const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-REPLACE_YOUR_LINK_HERE/pub?output=csv";
+      const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3Na1TFEHoAXsdgKBr6s4eBSFCRHtlMv14UXoO6hD2gxybZpXNAaG0IOw1W0GX5J_cmq0Mnu3J-K77/pub?gid=0&single=true&output=csv";
       fetch(SHEET_CSV_URL)
         .then(res => res.text())
         .then(csv => {
