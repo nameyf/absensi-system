@@ -7,44 +7,61 @@
   <style>
     body { font-family: sans-serif; padding: 20px; }
     label { display: block; margin: 10px 0 5px; }
+    input, select { width: 100%; padding: 5px; }
     video, canvas { width: 100%; max-width: 320px; border: 1px solid #ccc; }
     button { padding: 10px 20px; margin-top: 15px; }
+    #loginSection, #absenSection { display: none; }
   </style>
 </head>
 <body>
   <h2>📍 打卡系统 Sistem Absensi</h2>
 
-  <form id="form">
-    <label>姓名 / Nama:</label>
-    <input type="text" name="name" required>
+  <!-- 登录区域 -->
+  <div id="loginSection">
+    <label>账号 / Akun:</label>
+    <input type="text" id="username">
 
-    <label>打卡类型 / Jenis Absensi:</label>
-    <select name="type">
-      <option>上班 / Masuk</option>
-      <option>下班 / Pulang</option>
-      <option>加班开始 / Mulai Lembur</option>
-      <option>加班结束 / Selesai Lembur</option>
-      <option>夜班开始 / Mulai Shift Malam</option>
-      <option>夜班结束 / Selesai Shift Malam</option>
-    </select>
+    <label>密码 / Kata Sandi:</label>
+    <input type="password" id="password">
 
-    <label>拍照 / Ambil Foto:</label>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <button onclick="login()">🔐 登录 / Masuk</button>
+  </div>
 
-    <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
-  </form>
+  <!-- 打卡区域 -->
+  <div id="absenSection">
+    <form id="form">
+      <label>姓名 / Nama:</label>
+      <input type="text" name="name" required>
+
+      <label>打卡类型 / Jenis Absensi:</label>
+      <select name="type">
+        <option>上班 / Masuk</option>
+        <option>下班 / Pulang</option>
+        <option>加班开始 / Mulai Lembur</option>
+        <option>加班结束 / Selesai Lembur</option>
+        <option>夜班开始 / Mulai Shift Malam</option>
+        <option>夜班结束 / Selesai Shift Malam</option>
+      </select>
+
+      <label>拍照 / Ambil Foto:</label>
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" style="display:none;"></canvas>
+
+      <button type="button" onclick="submitData()">📸 打卡 / Absen</button>
+    </form>
+  </div>
 
   <script>
     const video = document.getElementById("video");
+    const usernameField = document.getElementById("username");
+    const passwordField = document.getElementById("password");
+    const loginSection = document.getElementById("loginSection");
+    const absenSection = document.getElementById("absenSection");
 
-    // ✅ 工厂坐标（可添加多个）
     const factoryCoords = [
-      { lat: -6.270964853426686, lng: 106.35419911087402 },  // 工厂 1
-      { lat: -6.270964853426686, lng: 106.35419911087402 }   // 工厂 2（与工厂1相同）
+      { lat: -6.270964853426686, lng: 106.35419911087402 }
     ];
 
-    // ✅ 计算两个点之间的距离（单位：米）
     function distance(lat1, lng1, lat2, lng2) {
       const R = 6371000;
       const toRad = x => x * Math.PI / 180;
@@ -57,16 +74,31 @@
       return R * c;
     }
 
-    // ✅ 判断当前位置是否在任一工厂范围内（200米）
     function inFactoryRange(lat, lng) {
       return factoryCoords.some(coord => distance(lat, lng, coord.lat, coord.lng) <= 200);
     }
 
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-      video.srcObject = stream;
-    });
+    function login() {
+      const username = usernameField.value.trim();
+      const password = passwordField.value.trim();
+      if (!username || !password) return alert("请输入账号和密码 / Harap isi akun dan kata sandi");
+
+      // 保存登录状态（本地）
+      localStorage.setItem("username", username);
+      localStorage.setItem("password", password);
+
+      loginSection.style.display = "none";
+      absenSection.style.display = "block";
+
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+      });
+    }
 
     async function submitData() {
+      const username = localStorage.getItem("username");
+      const password = localStorage.getItem("password");
+
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
       canvas.width = video.videoWidth;
@@ -79,12 +111,14 @@
         const lng = pos.coords.longitude;
 
         if (!inFactoryRange(lat, lng)) {
-          alert("❌ 您不在工厂范围内，无法打卡。\nTidak dalam area pabrik, absen ditolak.");
+          alert("❌ 不在工厂范围，无法打卡\nTidak dalam area pabrik");
           return;
         }
 
         const form = document.getElementById("form");
         const data = new FormData(form);
+        data.append("username", username);
+        data.append("password", password);
         data.append("photo", photo);
         data.append("lat", lat);
         data.append("lng", lng);
@@ -92,13 +126,14 @@
         await fetch("https://script.google.com/macros/s/AKfycbzm_tUF16myXTYSs0QvzDNBCciMNG0sLTRfRS5WcPI3NVjeo-n-4FPRKXGvy79vKzYm/exec", {
           method: "POST",
           body: data,
-        });
-
-        alert("✅ 打卡成功 / Absen berhasil");
+        }).then(r => r.text()).then(msg => alert(msg));
       }, () => {
         alert("❌ 获取定位失败 / Gagal mengambil lokasi");
       });
     }
+
+    // 初始显示登录界面
+    loginSection.style.display = "block";
   </script>
 </body>
 </html>
